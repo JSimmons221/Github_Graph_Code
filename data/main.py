@@ -16,8 +16,11 @@ COMMIT_PATH = '/CommitData/C_'
 STRUCT_PATH = '/FileStructureData/F_'
 ISSUE_PATH = '/IssueData/I_'
 TEST = 'C_Alexander-MacDonald_test-repo'
+REPO_DATA = "repo_data" + CSV
 
 
+# Returns the number of open issues, closed issues, and total issues for a given repo
+# path is the path to the issue data csv for the repo
 def get_issue_data(path):
     df = pd.read_csv(path)
     col = df['state']
@@ -27,6 +30,8 @@ def get_issue_data(path):
     return open_issues, closed_issues, total_issues
 
 
+# Returns the total number of additions and deletions for a given repo
+# path is the path to the commit data csv for the repo
 def get_commit_data(path):
     df = pd.read_csv(path)
     total_additions = df['totalAdditions'].sum()
@@ -34,13 +39,18 @@ def get_commit_data(path):
     return total_additions, total_deletions
 
 
+# Returns the number of files for a given repo
+# path is the path to the repository file structure csv for the repo
 def get_num_files(path):
     df = pd.read_csv(path)
     return df['owner'].count()
 
 
-# Creates a CSV with all data needed for the machine learning algorithms from the parsed repository data
+# Creates a CSV with all data needed for the machine learning algorithms using the above functions to parse data
+# path is the path to where you put the 1_data folder
+# output_path is the directory to put the output file in
 def read_repositories(path, output_path):
+    # filtered_ParsedRepos is in the drive
     repositories = pd.read_csv(r'./data/filtered_ParsedRepos.csv')
     repositories = repositories[['owner', 'repo', 'cloneURL', 'stars', 'dateCreated', 'datePushed', 'numCommits']]
     repositories['dateCreated'] = pd.to_datetime(repositories['dateCreated'], format='%Y-%m-%dT%H:%M:%SZ').astype(
@@ -101,10 +111,16 @@ def read_repositories(path, output_path):
     repositories = repositories[repositories.include == True]
 
     repositories = repositories.drop('include', axis=1)
-    repositories.to_csv(output_path, index=False)
+    repositories.to_csv(output_path + REPO_DATA, index=False)
 
 
+# Calls functions from graph_functions to add a repos data to the DGL dataset
+# path is the path to where you put the 1_data folder
+# filename is the author and repo name of the repo
+# graph_id is an id for the given graph
+# output_path is the directory to put the output file in
 def get_graph_data(path, filename, graph_id, output_path):
+    # Gets this sizes of each of the files in the repository for node features
     file_structure = pd.read_csv(path + STRUCT_PATH + filename)
     file_sizes = file_structure['fileTuple<fileName.fileSize>'].str.split('\\((.+), (.+)\\)', expand=True, regex=True,n=1)
     file_sizes = file_sizes.drop([0, 3], axis=1)
@@ -112,6 +128,10 @@ def get_graph_data(path, filename, graph_id, output_path):
     graph_files(path + COMMIT_PATH + filename, graph_id, file_sizes, output_path)
 
 
+# Sets up the files for the DGL dataset and calls get_graph_data for each repo
+# path is the path to where you put the 1_data folder
+# filename is the location of the file from read_repositories
+# output_path is the directory to put the output file in
 def get_all_data(path, filename, output_path):
     graph_dataframe = pd.read_csv(filename)
     graph_data = graph_dataframe[['owner', 'repo']].to_numpy()
@@ -154,6 +174,3 @@ def get_all_data(path, filename, output_path):
 # i_path = "D:/1_Data"
 # o_path = "D:/1_Data/GraphData"
 # get_all_data(i_path, r'./data/MI_final_parsed.csv', o_path)
-
-arr = np.arange(15)
-print(np.insert(arr, 0, 16))

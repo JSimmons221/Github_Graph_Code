@@ -4,8 +4,12 @@ import json
 import pandas as pd
 
 
-# Used to read the commit data for a repository
-def read_csv(fname, graph_id, file_sizes, files):
+# Determines the nodes of the graphs and creates lists of which nodes appear in which commits for graphing purposes
+# fname is the path to the commit_data csv for the repo
+# graph_id is the id for the graph in the DGL dataset
+# file_sizes is a data frame with the files their file sizes for a repo
+# files is an empty dictionary to store the files and their data in
+def get_repo_graph(fname, graph_id, file_sizes, files):
     df = pd.read_csv(fname)
     # Old column title was unwieldy
     df = df.rename(columns={'fileTuples<fileName. status. additions. deletions. changes. raw_url. contents_url>': 'files'})
@@ -60,10 +64,14 @@ def read_csv(fname, graph_id, file_sizes, files):
     return commits, node_id
 
 
-# Creates the DGL dataset for a repository by going through each of the commits and linking files.
+# Creates the data for a repository to put in the DGL dataset
+# fname is the path to the commit_data csv for the repo
+# graph_id is the id for the graph in the DGL dataset
+# file_sizes is a data frame with the files their file sizes for a repo
+# output_path is where the DGL dataset is being stored
 def graph_files(fname, graph_id, file_sizes, output_path):
     files = {}
-    commit_files, node_id = read_csv(fname, graph_id, file_sizes, files)
+    commit_files, node_id = get_repo_graph(fname, graph_id, file_sizes, files)
 
     g = {}
     for commit in commit_files:
@@ -94,6 +102,9 @@ def graph_files(fname, graph_id, file_sizes, output_path):
     edges.to_csv(output_path + '/edges.csv', header=False, mode='a', index=False)
 
 
+# Returns the encoding of a language type based on an extension
+# extension is a file extension
+# hard_coded is a loaded .json file
 def get_file_lang(extension, hard_coded):
     if extension in hard_coded:
         return hard_coded[extension]
