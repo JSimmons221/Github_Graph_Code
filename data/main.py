@@ -133,6 +133,7 @@ def get_graph_data(path, filename, graph_id, output_path):
 # filename is the location of the file from read_repositories
 # output_path is the directory to put the output file in
 def get_all_data(path, filename, output_path):
+    os.makedirs(output_path, exist_ok=True)
     graph_dataframe = pd.read_csv(filename)
     graph_data = graph_dataframe[['owner', 'repo']].to_numpy()
     files = glob.glob(output_path + "/*.csv")
