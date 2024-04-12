@@ -148,7 +148,7 @@ def get_all_data(path, filename, output_path):
     f.close()
 
     f = open(output_path + '/graphs.csv', 'w')
-    f.write('graph_id\n')
+    f.write('graph_id,feats,target\n')
 
     graph_id = 0
     for repository in graph_data:
@@ -165,10 +165,8 @@ def get_all_data(path, filename, output_path):
             graph_id += 1
         except:
             print("An error happened somewhere, I will fix this later to be more exact about what happened (maybe)")
-            graph_dataframe = graph_dataframe.drop(graph_id)
 
     f.close()
-    graph_dataframe.to_csv(output_path + '/graph_data.csv')
 
 
 # i_path = "D:/1_Data"
