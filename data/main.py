@@ -134,8 +134,12 @@ def get_graph_data(path, filename, graph_id, output_path):
 # output_path is the directory to put the output file in
 def get_all_data(path, filename, output_path):
     os.makedirs(output_path, exist_ok=True)
+
     graph_dataframe = pd.read_csv(filename)
-    graph_data = graph_dataframe[['owner', 'repo']].to_numpy()
+    graph_data = graph_dataframe[['owner', 'repo', 'stars', 'dateCreated', 'datePushed', 'numCommits',
+                                'openIssues', 'closedIssues', 'totalIssues', 'totalAdditions',
+                                'totalDeletions', 'fileCount', 'Maintainability Index']].to_numpy()
+
     files = glob.glob(output_path + "/*.csv")
     for f in files:
         os.remove(f)
@@ -157,16 +161,19 @@ def get_all_data(path, filename, output_path):
             print(graph_id)
             print(datetime.now().strftime("%H:%M:%S"))
 
-        print(repository)
+        # print(repository)
         owner = repository[0]
         repo = repository[1]
+
+        features = list(repository[2:12])
+        label = repository[12]
+        
         try:
             get_graph_data(path, owner + '_' + repo + CSV, graph_id, output_path)
-            f.write(str(graph_id) + '\n')
+            f.write(f"{graph_id},{features},{label}\n")
             graph_id += 1
-        except:
-            print("An error happened somewhere, I will fix this later to be more exact about what happened (maybe)")
-
+        except Exception as e:
+            print(f"An error happened somewhere: ({e})")
     f.close()
 
 
