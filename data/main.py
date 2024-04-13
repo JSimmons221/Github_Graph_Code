@@ -170,7 +170,8 @@ def get_all_data(path, filename, output_path):
         
         try:
             get_graph_data(path, owner + '_' + repo + CSV, graph_id, output_path)
-            f.write(f"{graph_id},{features},{label}\n")
+            stringified_features = ','.join(map(str, features))
+            f.write(f"{graph_id},[{stringified_features}],{label}\n")
             graph_id += 1
         except Exception as e:
             print(f"An error happened somewhere: ({e})")
