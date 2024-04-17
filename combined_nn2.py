@@ -19,9 +19,6 @@ ds = CSVDataset('data/1_Data/GraphData')
 
 print("Number of graphs:", len(ds))
 
-graphs = [graph[0].to(device) for graph in ds]  # each tuple's first element is a graph
-labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item is target (maintainability index)
-
 class GAE(nn.Module):
     def __init__(self, in_feats, hidden_dims, out_dim):
         super(GAE, self).__init__()
@@ -43,11 +40,14 @@ class GAE(nn.Module):
         return reconstructed, pred
 
 class InnerProductDecoder(nn.Module):
+    def __init__(self, dropout_rate=0.1):
+        super(InnerProductDecoder, self).__init__()
+        self.dropout = nn.Dropout(dropout_rate)
+
     def forward(self, z):
+        z = self.dropout(z)
         adj = th.sigmoid(th.matmul(z, z.t()))
         return adj
-
-model = GAE(graphs[0].ndata['feats'].shape[1], [64, 32], 16).to(device)
 
 # features = graphs[0].ndata['feats']
 # reconstructed, pred = model(graphs[0], features)
@@ -86,14 +86,17 @@ class Trainer:
                 
                 total_loss += loss.item()
 
-            print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader)}', 'Validation Loss: ', self.evaluate(data_loader))
+            print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader)}')
 
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
 
+graphs = [graph[0].to(device) for graph in ds]  # each tuple's first element is a graph
+labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item is target (maintainability index)
+
+model = GAE(graphs[0].ndata['feats'].shape[1], [64, 32], 16).to(device)
+
 data_loader = GraphDataLoader(list(zip(graphs, labels)), batch_size=5, shuffle=True)
-
-
 
 model = GAE(in_feats=graphs[0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
 trainer = Trainer(model, learning_rate=0.001)
