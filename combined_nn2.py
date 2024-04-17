@@ -54,9 +54,6 @@ class InnerProductDecoder(nn.Module):
         adj = th.sigmoid(th.matmul(z, z.t()))
         return adj
 
-# features = graphs[0].ndata['feats']
-# reconstructed, pred = model(graphs[0], features)
-
 def loss_function(reconstructed, adj_label, pred, label):
     loss_recon = F.binary_cross_entropy(reconstructed.view(-1), adj_label.view(-1))
     loss_pred = F.mse_loss(pred, label)
@@ -69,13 +66,19 @@ class Trainer:
         self.optimizer = th.optim.Adam(model.parameters(), lr=learning_rate)
         self.scheduler = StepLR(self.optimizer, step_size=10, gamma=0.8) # decay .8 every 10 epochs
 
-    def train(self, train_loader, val_loader, epochs=50):
+    def train(self, train_loader, val_loader=None, epochs=50):
         for epoch in range(epochs):
             t_loss, t_acc, t_mape = self.run_epoch(train_loader, train=True)
-            v_loss, v_acc, v_mape = self.run_epoch(val_loader, train=False)
+            train_stats = f'Train Loss: {t_loss:.4f}, Train % Correct: {t_acc:.4f}, Train MAPE: {t_mape:.4f}%'
+            
+            if validate_while_training and val_loader is not None:
+                v_loss, v_acc, v_mape = self.run_epoch(val_loader, train=False)
+                val_stats = f'Validation Loss: {v_loss:.4f}, Val % Correct: {v_acc:.4f}, Val MAPE: {v_mape:.4f}%'
+            else:
+                val_stats = "Validation skipped"
+
             self.scheduler.step()
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss:.4f}, Train % correct: {t_acc:.4f}, Train MAPE: {t_mape:.4f}%,\n'
-                f'Validation Loss: {v_loss:.4f}, Val % correct {v_acc:.4f}, Val MAPE: {v_mape:.4f}%')
+            print(f'Epoch {epoch+1}/{epochs}, {train_stats},\n {val_stats}')
 
     def run_epoch(self, data_loader, train=True):
         total_loss = 0
@@ -127,11 +130,17 @@ class Trainer:
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
 
-# all data
-# graphs_labels = [(g[0], g[1]['target'].float()) for g in ds] # each tuple's first element is a graph
-# data_loader = GraphDataLoader(graphs_labels, batch_size=5, shuffle=True) # second item is target (maintainability index)
-
 graphs_labels = [(g[0], g[1]['target'].float()) for g in ds]
+
+validate_while_training = True # False to save VRAM
+
+train_data = graphs_labels
+val_data = None
+if validate_while_training:
+    train_data, val_data = train_test_split(graphs_labels, test_size=0.2)
+    val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
+train_loader = GraphDataLoader(train_data, batch_size=5, shuffle=True)
+
 
 # split data
 train_data, val_data = train_test_split(graphs_labels, test_size=0.2)
@@ -141,8 +150,6 @@ val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
 
 model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
 trainer = Trainer(model, learning_rate=0.001)
-
-# trainer.train(data_loader, epochs=50)
-trainer.train(train_loader, val_loader, epochs=50)
+trainer.train(train_loader, val_loader if validate_while_training else None, epochs=50)
 
 trainer.save_model("model1.pth")
