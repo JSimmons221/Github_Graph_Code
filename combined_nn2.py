@@ -71,43 +71,58 @@ class Trainer:
 
     def train(self, train_loader, val_loader, epochs=50):
         for epoch in range(epochs):
-            t_loss = 0
-            for batched_graph, labels in train_loader:
-                batched_graph = batched_graph.to(device)
-                labels = labels.to(device).view(-1, 1)  # label shape shape [batch_size, 1]
+            t_loss, t_acc, t_mape = self.run_epoch(train_loader, train=True)
+            v_loss, v_acc, v_mape = self.run_epoch(val_loader, train=False)
+            self.scheduler.step()
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss}, Train % correct: {t_acc}, Train MAPE: {t_mape}%\n, '
+                  f'Validation Loss: {v_loss}, Val % correct {v_acc}, Val MAPE: {v_mape}%')
 
-                features = batched_graph.ndata['feats']
+    def run_epoch(self, data_loader, train=True):
+        total_loss = 0
+        total_correct = 0
+        total_mape = 0
+        total_elements = 0
+        if train:
+            self.model.train()
+        else:
+            self.model.eval()
+        
+        for batched_graph, labels in data_loader:
+            batched_graph = batched_graph.to(device)
+            labels = labels.to(device).view(-1, 1) # label shape shape [batch_size, 1]
+            features = batched_graph.ndata['feats']
+            
+            if train:
                 self.optimizer.zero_grad()
-                
-                reconstructed, preds = self.model(batched_graph, features)
-                
-                adj_label = batched_graph.adjacency_matrix().to_dense().to(device)
-
-                loss = loss_function(reconstructed, adj_label, preds, labels)
+            
+            reconstructed, preds = self.model(batched_graph, features)
+            adj_label = batched_graph.adjacency_matrix().to_dense().to(device)
+            loss = loss_function(reconstructed, adj_label, preds, labels)
+            if train:
                 loss.backward()
                 self.optimizer.step()
-                t_loss += loss.item()
 
-            v_loss = self.evaluate(val_loader)
-            self.scheduler.step()
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss/len(train_loader)}, Validation Loss: {v_loss}')
+            total_loss += loss.item()
+            correct, total = self.percent_correct(reconstructed, adj_label)
+            total_correct += correct
+            total_elements += total
+            total_mape += self.calculate_mape(preds, labels)
 
-    # same as train but without optimizer step or backprop
-    def evaluate(self, data_loader):
-        self.model.eval()
-        v_loss = 0
-        with th.no_grad():
-            for batched_graph, labels in data_loader:
-                batched_graph = batched_graph.to(device)
-                labels = labels.to(device).view(-1, 1)
+        avg_loss = total_loss / len(data_loader)
+        accuracy = (total_correct / total_elements) * 100
+        mape = (total_mape / len(data_loader))
+        return avg_loss, accuracy, mape
 
-                reconstructed, preds = self.model(batched_graph, batched_graph.ndata['feats'])
+    def percent_correct(self, reconstructed, adj_label):
+        predicted = (reconstructed > 0.5).float()
+        correct = (predicted == adj_label).float().sum()
+        return correct.item(), adj_label.numel()
 
-                adj_label = batched_graph.adjacency_matrix().to_dense().to(device)
-
-                loss = loss_function(reconstructed, adj_label, preds, labels)
-                v_loss += loss.item()
-        return v_loss / len(data_loader)
+    def calculate_mape(self, preds, true_values):
+        nonzero_mask = true_values != 0
+        if th.sum(nonzero_mask) == 0:
+            return 0
+        return (th.abs(preds[nonzero_mask] - true_values[nonzero_mask]) / th.abs(true_values[nonzero_mask])).mean().item() * 100
 
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
