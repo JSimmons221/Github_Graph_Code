@@ -1,5 +1,6 @@
 import os
 import dgl
+from sklearn.model_selection import train_test_split
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
@@ -68,11 +69,10 @@ class Trainer:
         self.optimizer = th.optim.Adam(model.parameters(), lr=learning_rate)
         self.scheduler = StepLR(self.optimizer, step_size=10, gamma=0.8) # decay .8 every 10 epochs
 
-    def train(self, data_loader, epochs=50):
-        self.model.train()
+    def train(self, train_loader, val_loader, epochs=50):
         for epoch in range(epochs):
-            total_loss = 0
-            for batched_graph, labels in data_loader:
+            t_loss = 0
+            for batched_graph, labels in train_loader:
                 batched_graph = batched_graph.to(device)
                 labels = labels.to(device).view(-1, 1)  # label shape shape [batch_size, 1]
 
@@ -86,21 +86,48 @@ class Trainer:
                 loss = loss_function(reconstructed, adj_label, preds, labels)
                 loss.backward()
                 self.optimizer.step()
-                
-                total_loss += loss.item()
+                t_loss += loss.item()
 
+            val_loss = self.evaluate(val_loader)
             self.scheduler.step()
-            print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader)}')
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss/len(train_loader)}, Validation Loss: {val_loss}')
+
+    # same as train but without optimizer step or backprop
+    def evaluate(self, data_loader):
+        self.model.eval()
+        v_loss = 0
+        with th.no_grad():
+            for batched_graph, labels in data_loader:
+                batched_graph = batched_graph.to(device)
+                labels = labels.to(device).view(-1, 1)
+
+                reconstructed, preds = self.model(batched_graph, batched_graph.ndata['feats'])
+
+                adj_label = batched_graph.adjacency_matrix().to_dense().to(device)
+
+                loss = loss_function(reconstructed, adj_label, preds, labels)
+                v_loss += loss.item()
+        return v_loss / len(data_loader)
 
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
 
-graphs_labels = [(g[0], g[1]['target'].float()) for g in ds] # each tuple's first element is a graph
-data_loader = GraphDataLoader(graphs_labels, batch_size=5, shuffle=True) # second item is target (maintainability index)
+# all data
+# graphs_labels = [(g[0], g[1]['target'].float()) for g in ds] # each tuple's first element is a graph
+# data_loader = GraphDataLoader(graphs_labels, batch_size=5, shuffle=True) # second item is target (maintainability index)
+
+graphs_labels = [(g[0], g[1]['target'].float()) for g in ds]
+
+# split data
+train_data, val_data = train_test_split(graphs_labels, test_size=0.2, random_state=42)
+train_loader = GraphDataLoader(train_data, batch_size=5, shuffle=True)
+val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
+
 
 model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
 trainer = Trainer(model, learning_rate=0.001)
 
-trainer.train(data_loader, epochs=50)
+# trainer.train(data_loader, epochs=50)
+trainer.train(train_loader, val_loader, epochs=50)
 
 trainer.save_model("model1.pth")
