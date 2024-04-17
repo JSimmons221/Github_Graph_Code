@@ -88,9 +88,9 @@ class Trainer:
                 self.optimizer.step()
                 t_loss += loss.item()
 
-            val_loss = self.evaluate(val_loader)
+            v_loss = self.evaluate(val_loader)
             self.scheduler.step()
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss/len(train_loader)}, Validation Loss: {val_loss}')
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss/len(train_loader)}, Validation Loss: {v_loss}')
 
     # same as train but without optimizer step or backprop
     def evaluate(self, data_loader):
