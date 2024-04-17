@@ -4,10 +4,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import GraphConv
-from torch.utils.data import DataLoader
 from dgl.dataloading import GraphDataLoader
 from dgl.data import CSVDataset
-import os
 
 os.environ["DGLBACKEND"] = "pytorch"
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -68,19 +66,17 @@ class Trainer:
         for epoch in range(epochs):
             total_loss = 0
             for batched_graph, labels in data_loader:
-                features = batched_graph.ndata['feats'].to(device)
+                batched_graph = batched_graph.to(device)
                 labels = labels.to(device).view(-1, 1)  # label shape shape [batch_size, 1]
-                
+
+                features = batched_graph.ndata['feats']
                 self.optimizer.zero_grad()
                 
                 reconstructed, preds = self.model(batched_graph, features)
                 
                 adj_label = batched_graph.adjacency_matrix().to_dense().to(device)
-                
-                loss_recon = F.binary_cross_entropy(reconstructed.view(-1), adj_label.view(-1))
-                loss_pred = F.mse_loss(preds, labels)  # both [batch_size, 1]
-                
-                loss = loss_recon + loss_pred
+
+                loss = loss_function(reconstructed, adj_label, preds, labels)
                 loss.backward()
                 self.optimizer.step()
                 
@@ -91,14 +87,12 @@ class Trainer:
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
 
-graphs = [graph[0].to(device) for graph in ds]  # each tuple's first element is a graph
-labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item is target (maintainability index)
+graphs_labels = [(g[0], g[1]['target'].float()) for g in ds] # each tuple's first element is a graph
+data_loader = GraphDataLoader(graphs_labels, batch_size=5, shuffle=True) # second item is target (maintainability index)
 
-data_loader = GraphDataLoader(list(zip(graphs, labels)), batch_size=5, shuffle=True)
-
-model = GAE(in_feats=graphs[0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
+model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
 trainer = Trainer(model, learning_rate=0.001)
 
-trainer.train(data_loader, epochs=20)
+trainer.train(data_loader, epochs=50)
 
 trainer.save_model("model1.pth")
