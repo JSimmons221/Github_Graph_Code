@@ -94,8 +94,6 @@ class Trainer:
 graphs = [graph[0].to(device) for graph in ds]  # each tuple's first element is a graph
 labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item is target (maintainability index)
 
-model = GAE(graphs[0].ndata['feats'].shape[1], [64, 32], 16).to(device)
-
 data_loader = GraphDataLoader(list(zip(graphs, labels)), batch_size=5, shuffle=True)
 
 model = GAE(in_feats=graphs[0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
