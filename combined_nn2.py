@@ -119,7 +119,7 @@ class Trainer:
         return correct.item(), adj_label.numel()
 
     def calculate_mape(self, preds, true_values):
-        nonzero_mask = true_values != 0
+        nonzero_mask = true_values != 0 # mask for nonzero values
         if th.sum(nonzero_mask) == 0:
             return 0
         return (th.abs(preds[nonzero_mask] - true_values[nonzero_mask]) / th.abs(true_values[nonzero_mask])).mean().item() * 100
