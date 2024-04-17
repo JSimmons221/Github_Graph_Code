@@ -21,17 +21,22 @@ class GAE(nn.Module):
     def __init__(self, in_feats, hidden_dims, out_dim):
         super(GAE, self).__init__()
         self.encoder = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()  # batch norm layers
         self.encoder.append(GraphConv(in_feats, hidden_dims[0], activation=F.relu, allow_zero_in_degree=True))
-        for i in range(1, len(hidden_dims)):
+        self.batch_norms.append(nn.BatchNorm1d(hidden_dims[0]))  # batch norm layer for first conv layer
+        
+        for i in range(1, len(hidden_dims)): # rest of the hidden layers in a loop to add so I can add normalization for each layer
             self.encoder.append(GraphConv(hidden_dims[i-1], hidden_dims[i], activation=F.relu, allow_zero_in_degree=True))
+            self.batch_norms.append(nn.BatchNorm1d(hidden_dims[i]))  # batch norm layer for each hidden layer
         self.decoder = InnerProductDecoder()
         self.regressor = nn.Linear(hidden_dims[-1], 1)  # regression to a single value
 
     def forward(self, g, features):
         h = features
-        for conv in self.encoder:
+        for conv, bn in zip(self.encoder, self.batch_norms):  # conv and batch norm
             h = conv(g, h)
-            g.ndata['h'] = h # latent rep
+            h = bn(h)  # batch normalization
+            g.ndata['h'] = h  # latent rep
         h_global = dgl.mean_nodes(g, 'h')
         reconstructed = self.decoder(h)
         pred = self.regressor(h_global)
