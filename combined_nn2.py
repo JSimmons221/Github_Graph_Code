@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from dgl.nn import GraphConv
 from dgl.dataloading import GraphDataLoader
 from dgl.data import CSVDataset
+from torch.optim.lr_scheduler import StepLR
 
 os.environ["DGLBACKEND"] = "pytorch"
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -65,7 +66,8 @@ class Trainer:
         self.model = model
         self.model.to(device)
         self.optimizer = th.optim.Adam(model.parameters(), lr=learning_rate)
-    
+        self.scheduler = StepLR(self.optimizer, step_size=10, gamma=0.8) # decay .8 every 10 epochs
+
     def train(self, data_loader, epochs=50):
         self.model.train()
         for epoch in range(epochs):
@@ -87,6 +89,7 @@ class Trainer:
                 
                 total_loss += loss.item()
 
+            self.scheduler.step()
             print(f'Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(data_loader)}')
 
     def save_model(self, path):
