@@ -11,7 +11,7 @@ import os
 
 os.environ["DGLBACKEND"] = "pytorch"
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
-device = th.device("cpu")
+# device = th.device("cpu")
 
 print(device)
 
@@ -20,7 +20,7 @@ ds = CSVDataset('data/1_Data/GraphData')
 print("Number of graphs:", len(ds))
 
 graphs = [graph[0].to(device) for graph in ds]  # each tuple's first element is a graph
-labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item contains target (maintainability index)
+labels = [graph[1]['target'].float().to(device) for graph in ds]  # second item is target (maintainability index)
 
 class GAE(nn.Module):
     def __init__(self, in_feats, hidden_dims, out_dim):
@@ -43,9 +43,7 @@ class GAE(nn.Module):
         return reconstructed, pred
 
 class InnerProductDecoder(nn.Module):
-    """Decoder model layer for link prediction."""
     def forward(self, z):
-        # Inner product
         adj = th.sigmoid(th.matmul(z, z.t()))
         return adj
 
