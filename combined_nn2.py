@@ -134,7 +134,7 @@ class Trainer:
 graphs_labels = [(g[0], g[1]['target'].float()) for g in ds]
 
 # split data
-train_data, val_data = train_test_split(graphs_labels, test_size=0.2, random_state=42)
+train_data, val_data = train_test_split(graphs_labels, test_size=0.2)
 train_loader = GraphDataLoader(train_data, batch_size=5, shuffle=True)
 val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
 
