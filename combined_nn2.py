@@ -11,6 +11,7 @@ import os
 
 os.environ["DGLBACKEND"] = "pytorch"
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
+device = th.device("cpu")
 
 print(device)
 
