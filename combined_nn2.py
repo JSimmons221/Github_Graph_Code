@@ -74,7 +74,7 @@ class Trainer:
             t_loss, t_acc, t_mape = self.run_epoch(train_loader, train=True)
             v_loss, v_acc, v_mape = self.run_epoch(val_loader, train=False)
             self.scheduler.step()
-            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss}, Train % correct: {t_acc}, Train MAPE: {t_mape}%\n, '
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {t_loss}, Train % correct: {t_acc}, Train MAPE: {t_mape}%,\n'
                   f'Validation Loss: {v_loss}, Val % correct {v_acc}, Val MAPE: {v_mape}%')
 
     def run_epoch(self, data_loader, train=True):
