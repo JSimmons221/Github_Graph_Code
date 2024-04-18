@@ -20,18 +20,28 @@ ds = CSVDataset('data/1_Data/GraphData')
 print("Number of graphs:", len(ds))
 
 class GAE(nn.Module):
-    def __init__(self, in_feats, hidden_dims, out_dim):
+    def __init__(self, in_feats, hidden_GAE, hidden_RGR):
         super(GAE, self).__init__()
         self.encoder = nn.ModuleList()
         self.batch_norms = nn.ModuleList()  # batch norm layers
-        self.encoder.append(GraphConv(in_feats, hidden_dims[0], activation=F.relu, allow_zero_in_degree=True))
-        self.batch_norms.append(nn.BatchNorm1d(hidden_dims[0]))  # batch norm layer for first conv layer
+        self.encoder.append(GraphConv(in_feats, hidden_GAE[0], activation=F.relu, allow_zero_in_degree=True))
+        self.batch_norms.append(nn.BatchNorm1d(hidden_GAE[0]))  # batch norm layer for first conv layer
         
-        for i in range(1, len(hidden_dims)): # rest of the hidden layers in a loop to add so I can add normalization for each layer
-            self.encoder.append(GraphConv(hidden_dims[i-1], hidden_dims[i], activation=F.relu, allow_zero_in_degree=True))
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dims[i]))  # batch norm layer for each hidden layer
+        for i in range(1, len(hidden_GAE)): # rest of the hidden layers in a loop to add so I can add normalization for each layer
+            self.encoder.append(GraphConv(hidden_GAE[i-1], hidden_GAE[i], activation=F.relu, allow_zero_in_degree=True))
+            self.batch_norms.append(nn.BatchNorm1d(hidden_GAE[i]))  # batch norm layer for each hidden layer
+        
         self.decoder = InnerProductDecoder()
-        self.regressor = nn.Linear(hidden_dims[-1], 1)  # regression to a single value
+        
+        # regression layers
+        reg_dims = hidden_RGR[:]
+        if reg_dims[-1] != 1:  # ensure final output of regression is a single value
+            reg_dims.append(1)
+        self.regressor_layers = nn.ModuleList()
+        in_dim = hidden_GAE[-1]
+        for dim in reg_dims:
+            self.regressor_layers.append(nn.Linear(in_dim, dim))
+            in_dim = dim
 
     def forward(self, g, features):
         h = features
@@ -39,9 +49,17 @@ class GAE(nn.Module):
             h = conv(g, h)
             h = bn(h)  # batch normalization
             g.ndata['h'] = h  # latent rep
+        
+        # global graph rep
         h_global = dgl.mean_nodes(g, 'h')
+        
         reconstructed = self.decoder(h)
-        pred = self.regressor(h_global)
+        
+        # regression
+        for layer in self.regressor_layers[:-1]:
+            h_global = F.relu(layer(h_global))
+        pred = self.regressor_layers[-1](h_global)
+        
         return reconstructed, pred
 
 class InnerProductDecoder(nn.Module):
@@ -148,7 +166,7 @@ train_loader = GraphDataLoader(train_data, batch_size=5, shuffle=True)
 val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
 
 
-model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_dims=[64, 32], out_dim=1)
+model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_GAE=[64, 32, 16, 16], hidden_RGR=[16, 8])
 trainer = Trainer(model, learning_rate=0.001)
 trainer.train(train_loader, val_loader if validate_while_training else None, epochs=50)
 
