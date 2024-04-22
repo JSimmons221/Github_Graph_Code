@@ -15,7 +15,10 @@ device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 print(device)
 
+# for local
 ds = CSVDataset('data/1_Data/GraphData')
+# for kaggle
+# ds = CSVDataset('/kaggle/input/processedgraphs/GraphData')
 
 print("Number of graphs:", len(ds))
 
@@ -80,6 +83,8 @@ def loss_function(reconstructed, adj_label, pred, label):
 class Trainer:
     def __init__(self, model, learning_rate=0.001):
         self.model = model
+        if device.type == 'cuda' and th.cuda.device_count() > 1:
+            self.model = nn.DataParallel(self.model)
         self.model.to(device)
         self.optimizer = th.optim.Adam(model.parameters(), lr=learning_rate)
         self.scheduler = StepLR(self.optimizer, step_size=10, gamma=0.8) # decay .8 every 10 epochs
@@ -166,8 +171,32 @@ train_loader = GraphDataLoader(train_data, batch_size=5, shuffle=True)
 val_loader = GraphDataLoader(val_data, batch_size=5, shuffle=False)
 
 
-model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_GAE=[64, 32, 16, 16], hidden_RGR=[16, 8])
-trainer = Trainer(model, learning_rate=0.001)
-trainer.train(train_loader, val_loader if validate_while_training else None, epochs=50)
+# model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_GAE=[64, 32, 16, 16], hidden_RGR=[16, 8])
+# trainer = Trainer(model, learning_rate=0.001)
+# trainer.train(train_loader, val_loader if validate_while_training else None, epochs=50)
 
-trainer.save_model("model1.pth")
+# trainer.save_model("model1.pth")
+
+learning_rates = [0.01, 0.001, 0.0001]
+gae_layer_configs = [[64, 32], [64, 32, 16], [64, 32, 16, 16]]
+rgr_layer_configs = [[16], [16, 8], [16, 8, 4]]
+
+best_validation_loss = float('inf')
+best_config = {}
+
+for lr in learning_rates:
+    for gae_layers in gae_layer_configs:
+        for rgr_layers in rgr_layer_configs:
+            model = GAE(in_feats=graphs_labels[0][0].ndata['feats'].shape[1], hidden_GAE=gae_layers, hidden_RGR=rgr_layers)
+            trainer = Trainer(model, learning_rate=lr)
+            print(f"Testing config: LR={lr}, GAE Layers={gae_layers}, RGR Layers={rgr_layers}")
+            trainer.train(train_loader, val_loader, epochs=50)
+            
+            _, _, validation_mape = trainer.run_epoch(val_loader, train=False)
+            
+            if validation_mape < best_validation_loss:
+                best_validation_loss = validation_mape
+                best_config = {'lr': lr, 'gae_layers': gae_layers, 'rgr_layers': rgr_layers}
+                trainer.save_model("/kaggle/working/best_model.pth")
+
+print(f"Best config: {best_config}, with Validation MAPE: {best_validation_loss}")
