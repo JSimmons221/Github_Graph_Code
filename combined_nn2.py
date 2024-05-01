@@ -20,7 +20,12 @@ ds = CSVDataset('data/1_Data/GraphData')
 # for kaggle
 # ds = CSVDataset('/kaggle/input/processedgraphs/GraphData')
 
-print("Number of graphs:", len(ds))
+undirected_ds = []
+for g, label in ds:
+    undirected_g = dgl.add_reverse_edges(g)
+    undirected_ds.append((undirected_g, label))
+
+print("Number of graphs:", len(ds), len(undirected_ds))
 
 class GAE(nn.Module):
     def __init__(self, in_feats, hidden_GAE, hidden_RGR):
