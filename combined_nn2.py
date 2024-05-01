@@ -158,7 +158,7 @@ class Trainer:
     def save_model(self, path):
         th.save(self.model.state_dict(), path)
 
-graphs_labels = [(g[0], g[1]['target'].float()) for g in ds]
+graphs_labels = [(g[0], g[1]['target'].float()) for g in undirected_ds]
 
 validate_while_training = True # False to save VRAM
 
